@@ -119,11 +119,16 @@ async def analyze_video(request: Request, video: UploadFile = File(...)):
 
             ear_pt = (int(ear[0] * width), int(ear[1] * height))
             shoulder_pt = (int(shoulder[0] * width), int(shoulder[1] * height))
-            neck_tip = (int((ear[0] + 0.05) * width), int((ear[1] - 1) * height))
+            neck_tip = (int(ear[0] * width), int((ear[1] - 0.2) * height))
 
             cv2.line(frame, shoulder_pt, ear_pt, (0, 255, 255), 2)
             cv2.line(frame, ear_pt, neck_tip, (0, 255, 255), 2)
-            cv2.putText(frame, f"Neck: {int(neck_angle)}°", (ear_pt[0] + 10, ear_pt[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+
+            neck_msg = f"Neck bent forward: {int(neck_angle)}°" if neck_angle > 30 else f"Neck OK: {int(neck_angle)}°"
+            text_x = min(ear_pt[0] + 30, width - 200)
+            text_y = max(ear_pt[1] - 40, 20)
+
+            cv2.putText(frame, neck_msg, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
 
         if issues:
             bad_frames += 1
