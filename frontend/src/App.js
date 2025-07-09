@@ -30,7 +30,7 @@ export default function App() {
     formData.append("video", file);
 
     try {
-      const res = await fetch("http://192.168.215.86:8000/analyze", {
+      const res = await fetch("https://full-stack-rule-based-bad-posture-bs2f.onrender.com/analyze", {
         method: "POST",
         body: formData,
       });

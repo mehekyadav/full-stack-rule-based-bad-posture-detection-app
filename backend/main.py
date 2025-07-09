@@ -32,6 +32,9 @@ def calculate_angle(a, b, c):
     angle = np.abs(radians * 180.0 / np.pi)
     return angle if angle <= 180 else 360 - angle
 
+@app.get("/")
+def root():
+    return {"message": "Backend is running successfully!"}
 
 @app.post("/analyze")
 async def analyze_video(video: UploadFile = File(...)):
@@ -138,13 +141,14 @@ async def analyze_video(video: UploadFile = File(...)):
     cap.release()
     out.release()
 
+    base_url = str(request.base_url).rstrip("/")
     summary = {
         "total_frames": frame_num,
         "bad_posture_frames": bad_frames,
         "issue_counts": issue_counter,
         "bad_posture_timestamps": bad_frame_times,
         "video_filename": output_name,
-        "video_url": f"http://192.168.215.86:8000/video/{output_name}"
+        "video_url": f"{base_url}/video/{output_name}"
     }
 
     return JSONResponse(content=summary)
