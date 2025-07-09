@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, File, UploadFile, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -37,7 +37,7 @@ def root():
     return {"message": "Backend is running successfully!"}
 
 @app.post("/analyze")
-async def analyze_video(video: UploadFile = File(...)):
+async def analyze_video(request: Request, video: UploadFile = File(...)):
     # Save to temporary file
     with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as temp_file:
         temp_file.write(await video.read())
