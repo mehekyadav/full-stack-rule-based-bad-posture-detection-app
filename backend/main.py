@@ -24,9 +24,10 @@ mp_pose = mp.solutions.pose
 pose = mp_pose.Pose()
 mp_drawing = mp.solutions.drawing_utils
 
+# Helper function
 def calculate_angle(a, b, c):
     a, b, c = np.array(a), np.array(b), np.array(c)
-    radians = np.arctan2(c[1]-b[1], c[0]-b[0]) - np.arctan2(a[1]-b[1], a[0]-b[0])
+    radians = np.arctan2(c[1] - b[1], c[0] - b[0]) - np.arctan2(a[1] - b[1], a[0] - b[0])
     angle = np.abs(radians * 180.0 / np.pi)
     return angle if angle <= 180 else 360 - angle
 
@@ -36,7 +37,6 @@ def root():
 
 @app.post("/analyze")
 async def analyze_video(request: Request, video: UploadFile = File(...)):
-    
     with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as temp_file:
         temp_file.write(await video.read())
         temp_path = temp_file.name
@@ -66,7 +66,6 @@ async def analyze_video(request: Request, video: UploadFile = File(...)):
 
         frame_num += 1
         timestamp = round(frame_num / fps, 2)
-
         img_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         results = pose.process(img_rgb)
         issues = []
@@ -80,66 +79,67 @@ async def analyze_video(request: Request, video: UploadFile = File(...)):
             ankle = get_xy(mp_pose.PoseLandmark.LEFT_ANKLE.value)
             shoulder = get_xy(mp_pose.PoseLandmark.LEFT_SHOULDER.value)
             ear = get_xy(mp_pose.PoseLandmark.LEFT_EAR.value)
+            left_shoulder = get_xy(mp_pose.PoseLandmark.LEFT_SHOULDER.value)
+            right_shoulder = get_xy(mp_pose.PoseLandmark.RIGHT_SHOULDER.value)
 
+            # === Back posture ===
             back_angle = calculate_angle(shoulder, hip, knee)
             if back_angle < 150:
-                issues.append("Back too bent (<150°)")
+                issues.append(f"Back too bent (angle: {int(back_angle)}° < 150°)")
                 issue_counter["Back"] += 1
 
+            # === Hunched shoulders ===
+            shoulder_drop_thresh = 0.05
+            shoulder_gap_thresh = 0.15
+            if abs(left_shoulder[1] - right_shoulder[1]) > shoulder_drop_thresh or \
+               abs(left_shoulder[0] - right_shoulder[0]) < shoulder_gap_thresh:
+                issues.append("Hunched back (shoulders uneven or too close)")
+                issue_counter["Back"] += 1
+                pt1 = (int(left_shoulder[0] * width), int(left_shoulder[1] * height))
+                pt2 = (int(right_shoulder[0] * width), int(right_shoulder[1] * height))
+                cv2.line(frame, pt1, pt2, (0, 255, 255), 2)
+
+            # === Slouching ===
+            vertical_posture = abs(shoulder[1] - hip[1])
+            if vertical_posture < 0.25:
+                issues.append("Slouching detected (shoulder too close to hip)")
+                issue_counter["Back"] += 1
+
+            # === Knee posture ===
             visibility_thresh = 0.5
             if (lm[mp_pose.PoseLandmark.LEFT_KNEE].visibility > visibility_thresh and
                 lm[mp_pose.PoseLandmark.LEFT_ANKLE].visibility > visibility_thresh):
-
-                if knee[0] > ankle[0]:  # Only for side-view detection
+                if knee[0] > ankle[0]:
                     issues.append("Knee over toe")
                     issue_counter["Knee"] += 1
 
-            neck_angle = calculate_angle(shoulder, ear, (ear[0], ear[1] - 0.2))
+            # === Neck posture ===
+            neck_angle = calculate_angle(shoulder, ear, (ear[0] + 0.05, ear[1] - 1))
             if neck_angle > 30:
-                issues.append("Neck bent forward")
+                issues.append(f"Neck bent forward (angle: {int(neck_angle)}° > 30°)")
                 issue_counter["Neck"] += 1
-
-            # Draw pose
-            mp_drawing.draw_landmarks(frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
-
-            # Draw labels
-            keypoints = {
-                "Ear": mp_pose.PoseLandmark.LEFT_EAR,
-                "Shoulder": mp_pose.PoseLandmark.LEFT_SHOULDER,
-                "Hip": mp_pose.PoseLandmark.LEFT_HIP,
-                "Knee": mp_pose.PoseLandmark.LEFT_KNEE,
-                "Ankle": mp_pose.PoseLandmark.LEFT_ANKLE
-            }
-
-            for label, idx in keypoints.items():
-                pt = lm[idx]
-                x, y = int(pt.x * width), int(pt.y * height)
-                cv2.circle(frame, (x, y), 5, (255, 255, 255), -1)
-                cv2.putText(frame, label, (x+5, y-5), cv2.FONT_HERSHEY_PLAIN, 1.2, (255, 255, 255), 2)
-
             ear_pt = (int(ear[0] * width), int(ear[1] * height))
             shoulder_pt = (int(shoulder[0] * width), int(shoulder[1] * height))
-            neck_tip = (int(ear[0] * width), int((ear[1] - 0.2) * height))
-
+            neck_tip = (int((ear[0] + 0.05) * width), int((ear[1] - 1) * height))
             cv2.line(frame, shoulder_pt, ear_pt, (0, 255, 255), 2)
             cv2.line(frame, ear_pt, neck_tip, (0, 255, 255), 2)
+            cv2.putText(frame, f"Neck Angle: {int(neck_angle)}°", (ear_pt[0] + 10, ear_pt[1] - 10),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
 
-            neck_msg = f"Neck bent forward: {int(neck_angle)}°" if neck_angle > 30 else f"Neck OK: {int(neck_angle)}°"
-            text_x = min(ear_pt[0] + 30, width - 200)
-            text_y = max(ear_pt[1] - 40, 20)
+            # === Draw pose landmarks ===
+            mp_drawing.draw_landmarks(frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
 
-            cv2.putText(frame, neck_msg, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
-
+        # === Frame Annotations ===
         if issues:
             bad_frames += 1
             bad_frame_times.append(timestamp)
             for i, msg in enumerate(issues):
-                cv2.putText(frame, msg, (10, 30 + i * 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                cv2.putText(frame, msg, (10, 30 + i * 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
         else:
-            cv2.putText(frame, "Good posture", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            cv2.putText(frame, "Good posture", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
 
-        # Show frame info
-        cv2.putText(frame, f"Frame: {frame_num} | Time: {timestamp:.2f}s", (10, height - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 1)
+        cv2.putText(frame, f"Frame: {frame_num} | Time: {timestamp:.2f}s", (10, height - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 1)
 
         out.write(frame)
 
