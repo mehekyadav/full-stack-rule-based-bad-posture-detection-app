@@ -24,8 +24,6 @@ mp_pose = mp.solutions.pose
 pose = mp_pose.Pose()
 mp_drawing = mp.solutions.drawing_utils
 
-# Helper function
-
 def calculate_angle(a, b, c):
     a, b, c = np.array(a), np.array(b), np.array(c)
     radians = np.arctan2(c[1]-b[1], c[0]-b[0]) - np.arctan2(a[1]-b[1], a[0]-b[0])
@@ -38,7 +36,7 @@ def root():
 
 @app.post("/analyze")
 async def analyze_video(request: Request, video: UploadFile = File(...)):
-    # Save to temporary file
+    
     with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as temp_file:
         temp_file.write(await video.read())
         temp_path = temp_file.name
@@ -119,16 +117,14 @@ async def analyze_video(request: Request, video: UploadFile = File(...)):
                 cv2.circle(frame, (x, y), 5, (255, 255, 255), -1)
                 cv2.putText(frame, label, (x+5, y-5), cv2.FONT_HERSHEY_PLAIN, 1.2, (255, 255, 255), 2)
 
-            # Neck angle visualization
             ear_pt = (int(ear[0] * width), int(ear[1] * height))
             shoulder_pt = (int(shoulder[0] * width), int(shoulder[1] * height))
-            neck_tip = (int((ear[0] + 0.05) * width), int((ear[1] - 0.2) * height))
+            neck_tip = (int((ear[0] + 0.05) * width), int((ear[1] - 1) * height))
 
             cv2.line(frame, shoulder_pt, ear_pt, (0, 255, 255), 2)
             cv2.line(frame, ear_pt, neck_tip, (0, 255, 255), 2)
             cv2.putText(frame, f"Neck: {int(neck_angle)}°", (ear_pt[0] + 10, ear_pt[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
 
-        # Overlay issues or OK
         if issues:
             bad_frames += 1
             bad_frame_times.append(timestamp)

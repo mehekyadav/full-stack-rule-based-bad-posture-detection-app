@@ -42,9 +42,9 @@ export default function App() {
       console.error("Upload failed", err);
     } finally {
       setLoading(false);
-      setVideoFile(null); // ✅ reset after upload
+      setVideoFile(null); 
       if(mode === "upload"){
-        document.getElementById("fileInput").value = ""; // ✅ clear input
+        document.getElementById("fileInput").value = ""; 
       }
     }
   };
@@ -58,8 +58,7 @@ export default function App() {
     const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true });
     setStream(mediaStream);
 
-    setShouldAttachStream(true); // Triggers useEffect to attach stream
-
+    setShouldAttachStream(true); 
     const mediaRecorder = new MediaRecorder(mediaStream, { mimeType: "video/webm" });
 
     mediaRecorder.ondataavailable = (e) => {
@@ -83,7 +82,6 @@ export default function App() {
       mediaRecorderRef.current.stop();
     }
 
-    // 🚨 Stop the webcam stream immediately here
     if (stream) {
       stream.getTracks().forEach((track) => track.stop());
       setStream(null);
@@ -96,17 +94,11 @@ export default function App() {
     setRecording(false);
   };
 
-  const formatTime = (sec) => {
-    const min = Math.floor(sec / 60);
-    const s = Math.floor(sec % 60);
-    return `${min}:${s.toString().padStart(2, "0")}`;
-  };
-
   useEffect(() => {
     if (shouldAttachStream && stream && previewRef.current) {
       previewRef.current.srcObject = stream;
       previewRef.current.play().catch(err => console.error("preview play error:", err));
-      setShouldAttachStream(false); // Prevent repeat
+      setShouldAttachStream(false); 
     }
   }, [shouldAttachStream, stream]);
 
@@ -126,7 +118,7 @@ export default function App() {
         width: '200px',
         height: '25px',
         borderRadius: '5px',
-        border: '2px solid blue', // add this
+        border: '2px solid blue', 
         padding: '2px'
       }}>
         <option value="upload">Upload Video</option>
