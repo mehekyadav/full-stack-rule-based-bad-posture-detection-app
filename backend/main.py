@@ -88,9 +88,13 @@ async def analyze_video(request: Request, video: UploadFile = File(...)):
                 issues.append("Back too bent (<150°)")
                 issue_counter["Back"] += 1
 
-            if knee[0] > ankle[0]:
-                issues.append("Knee over toe")
-                issue_counter["Knee"] += 1
+            visibility_thresh = 0.5
+            if (lm[mp_pose.PoseLandmark.LEFT_KNEE].visibility > visibility_thresh and
+                lm[mp_pose.PoseLandmark.LEFT_ANKLE].visibility > visibility_thresh):
+
+                if knee[0] > ankle[0]:  # Only for side-view detection
+                    issues.append("Knee over toe")
+                    issue_counter["Knee"] += 1
 
             neck_angle = calculate_angle(shoulder, ear, (ear[0], ear[1] - 0.2))
             if neck_angle > 30:
@@ -118,7 +122,7 @@ async def analyze_video(request: Request, video: UploadFile = File(...)):
             # Neck angle visualization
             ear_pt = (int(ear[0] * width), int(ear[1] * height))
             shoulder_pt = (int(shoulder[0] * width), int(shoulder[1] * height))
-            neck_tip = (int(ear[0] * width), int((ear[1] - 0.2) * height))
+            neck_tip = (int((ear[0] + 0.05) * width), int((ear[1] - 0.2) * height))
 
             cv2.line(frame, shoulder_pt, ear_pt, (0, 255, 255), 2)
             cv2.line(frame, ear_pt, neck_tip, (0, 255, 255), 2)
